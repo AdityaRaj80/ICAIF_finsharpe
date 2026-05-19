@@ -1,0 +1,62 @@
+{
+  "created": "2026-05-19",
+  "dataset": "FNSPID (contaminated-replication arm; PREREG amendment c)",
+  "scope": "C1-only; sentiment de-scoped to optional feature",
+  "window": {
+    "warmup": "2011-01-01..2012-12-31",
+    "inner_cpcv_pool": "2013-01-01..2020-12-31",
+    "norm_fit_subwindow": "2013-01-01..2019-12-31",
+    "test": "2021-01-01..2023-12-28",
+    "note": "NO separate calendar-2020 validation block; model selection/HPO via nested CPCV inner folds only (PREREGISTRATION.md \u00a73)"
+  },
+  "criteria": {
+    "first_date_max": "2011-01-01",
+    "last_date_min": "2023-12-20",
+    "n_rows_min": 2800,
+    "max_gap_days_max": 10,
+    "dollar_vol_min": 5000000,
+    "news_total_min": 500,
+    "train_years": [
+      2013,
+      2014,
+      2015,
+      2016,
+      2017,
+      2018,
+      2019
+    ],
+    "val_years": [
+      2020
+    ],
+    "test_years": [
+      2021,
+      2022,
+      2023
+    ],
+    "train_years_min": 5,
+    "test_years_min": 2
+  },
+  "counts": {
+    "all_price_tickers": 7693,
+    "symbols_with_news": 8552,
+    "tier1": 870,
+    "tier2": 150,
+    "excluded": {
+      "history_starts_too_late": 3855,
+      "price_ends_before_test_end(2020_freeze_or_delist)": 1239,
+      "illiquid": 1163,
+      "too_few_news_articles": 261,
+      "sparse_news_in_test": 96,
+      "price_gap_too_large": 78,
+      "etf_or_fund_or_leveraged": 75,
+      "sparse_news_in_train": 38,
+      "too_few_price_rows": 18
+    }
+  },
+  "known_limitations": [
+    "Survivorship: Tier-1 requires price through 2023; ~3,232 names end at the FNSPID mid-2020 data freeze (artifact, not real delisting). Only 2 names stop genuinely mid-history -> NO clean delisted control is internally constructible. Absolute Sharpe is optimistic; defensible claims are RELATIVE (model vs model, overlay on/off).",
+    "2021 news trough (~182k vs ~1.1M in 2018-19): test years 2021-22 are news-sparse; report sentiment results per-year, never pooled-only.",
+    "News two-file splice (~2020-06): All_external ends ~2020, nasdaq carries 2021-2023; dedup by (symbol,date,url) when building features.",
+    "ETF/fund screen is a curated heuristic blocklist (no security master); residual small-cap-lookalike contamination possible."
+  ]
+}

@@ -1,0 +1,23 @@
+# Raw data (FNSPID ~30GB) — never in git; download separately
+DATA/
+
+# Model weights (FinBERT ~1.3GB) — fetch from HuggingFace
+models/
+
+# Copyrighted reference PDFs — do not redistribute
+Related Works/
+
+# Large derived artifacts (reproducible from scripts+DATA)
+*.parquet
+
+# Run logs / temp
+universe/_*.txt
+panel/_*.txt
+*.log
+**/__pycache__/
+*.pyc
+.hf/
+.torch/
+.cache/
+.pipcache/
+.DS_Store
