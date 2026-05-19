@@ -60,6 +60,12 @@ ci = torch.allclose(others, o0, atol=1e-6) and not torch.allclose(
 rec("patchtst", "channel-independence (perturb chan7 -> others invariant)",
     ci, f"others_dmax={float((others-o0).abs().max()):.1e} "
         f"chan7_changed={float((r1[:,7]-r0[:,7]).abs().max()):.1e}")
+# DECISIVE for the model AS USED: forward() invariant to channel permutation
+with torch.no_grad():
+    perm = torch.randperm(Fd)
+    fperm_d = float((m(x) - m(x[:, :, perm])).abs().max())
+rec("patchtst", "forward() permutation-invariant over channels (head fix)",
+    fperm_d < 1e-4, f"max|f(x)-f(x[perm])|={fperm_d:.1e}")
 
 # ---- TCN: strict causality (future input cannot change past output) ----
 m = TCN(Fd, L, D).eval()
@@ -76,26 +82,35 @@ earliest = int(chg.min()) if len(chg) else L
 rec("cnn", "strict causality (perturb t=400 -> earliest change>=400)",
     earliest >= 400, f"earliest_changed={earliest}")
 
-# ---- DLinear: trend+seasonal reconstructs the input ----
+# ---- DLinear: moving-avg trend is SMOOTHER than the raw series ----
+# (re-jury-5 fix: prior recon test was true-by-construction since
+#  s := xf - t.  Smoothness is the real defining property of the
+#  decomposition: the trend's step-to-step variation must be much
+#  smaller than the raw input's.)
 m = DLinear(Fd, L, D).eval()
-t, s = m.decompose(x)
-recon = (t + s).transpose(1, 2)
-rec("dlinear", "decomposition recon (trend+seasonal==x)",
-    torch.allclose(recon, x, atol=1e-5),
-    f"max|recon-x|={float((recon-x).abs().max()):.1e}")
+t, s = m.decompose(x)                          # [B,F,L]
+v_in = (x.transpose(1, 2).diff(dim=-1).var()).item()
+v_tr = (t.diff(dim=-1).var()).item()
+rec("dlinear", "moving-avg trend smoother than input (var(dtrend)<<var(dx))",
+    v_tr < 0.5 * v_in,
+    f"var(d_trend)={v_tr:.3f} vs 0.5*var(d_x)={0.5*v_in:.3f}")
 
-# ---- GCformer: structured (sublinear) global kernel + full reach ----
+# ---- GCformer: STRUCTURED, sublinear, genuinely LONG-MEMORY kernel ----
+# (re-jury-5 fix: prior 'perturb t=0 -> output changes' conflated the
+#  global+local branches and passed on any nonzero tail. Test the kernel
+#  itself: sublinear params AND appreciable weight at the OLDEST lag
+#  relative to the most recent -> proves real long memory, not local.)
 m = GCformer(Fd, L, D).eval()
 kparams = m.decay.numel() + m.coef.numel()
-dense = D * L                                # a naive per-channel L-kernel
+dense = D * L
 with torch.no_grad():
-    z0 = m(x)
-    xz = x.clone(); xz[:, 0, :] += 9.0        # perturb the OLDEST step only
-    z1 = m(xz)
-reach = float((z1 - z0).abs().max()) > 1e-6   # local branch can't see t=0
-rec("gcformer", "structured global kernel (sublinear) + full receptive",
-    kparams < dense and reach,
-    f"kparams={kparams} << dense={dense}; t0_reaches_out={reach}")
+    k = m.global_kernel()                      # [d, L], flip-aligned
+oldest = k[:, 0].abs().mean().item()           # weight at lag L-1
+recent = k[:, -1].abs().mean().item()          # weight at lag 0
+rec("gcformer", "structured(sublinear) + long-memory(|k_oldest|>=1% |k_recent|)",
+    kparams < dense and oldest >= 0.01 * recent and recent > 0,
+    f"kparams={kparams}<<{dense}; |k_oldest|/|k_recent|="
+    f"{oldest/(recent+1e-12):.3f} (need>=0.01)")
 
 # ---- TFT: per-variable embed + variable-selection softmax over F ----
 m = TFT(Fd, L, D).eval()

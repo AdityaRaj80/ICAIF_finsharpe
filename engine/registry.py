@@ -11,6 +11,7 @@ from models import REGISTRY
 from heads import MSEReturnHead, RiskAwareHead, composite_risk_loss
 
 SEQ_LEN, N_FEAT, D_MODEL = 504, 65, 64   # smoke default; real sizes set at train
+TAU = 0.05                               # soft-top-decile temperature (PIN in PREREG §9, Task 48)
 
 
 class Model(nn.Module):
@@ -31,7 +32,7 @@ class Model(nn.Module):
         z = self.enc(batch["x"])
         if self.arm == "mse":
             return self.head.loss(z, batch)        # already (loss, {})
-        return composite_risk_loss(z, self.head, batch)
+        return composite_risk_loss(z, self.head, batch, tau=TAU)
 
 
 def build(name, arm):
@@ -49,6 +50,7 @@ if __name__ == "__main__":
         "y_ret": torch.randn(N) * 0.02,
         "y_vol": torch.rand(N) * 0.03,
         "date_id": torch.arange(n_dates).repeat_interleave(per),
+        "sym_id": torch.arange(per).repeat(n_dates),   # same stocks each date
     }
     print(f"{'model':<13}{'arm':<6}{'z.shape':<14}{'loss':>10}  params")
     ok = True

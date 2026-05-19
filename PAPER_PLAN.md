@@ -94,3 +94,17 @@ absolute-performance claim.
 Anchors: Moody & Saffell 1998; Zhang–Zohren–Roberts 2020; López de Prado
 (purged CV / DSR / PBO). FNSPID = the contaminated public benchmark we
 re-analyze rigorously. TFT-ASRO: not in positioning.
+
+## Protocol-iteration disclosure (re-jury-7 — mandatory paper section)
+
+The paper WILL contain a "Protocol iteration history" subsection
+reproducing PREREGISTRATION.md §11 amendments a–k **verbatim**, stating
+plainly: (i) the protocol was adversarially iterated 11× pre-execution;
+(ii) one pre-registered criterion that FAILED is preserved on the record
+(§9a-OUTCOME, anchor (iii)<0.80, 7/8 fail) — not deleted; (iii) the
+binding-freeze (k.1) is **honor-bound and disclosed, NOT externally
+enforceable** (no `.git`; author-controlled SHA) — reviewers are given
+the full history to price this themselves. We do NOT claim k.1 as a
+guarantee; we claim transparency. This converts the only un-priced
+structural risk (the amend-until-pass perception) into a disclosed,
+reviewer-judgeable limitation rather than a hidden one.

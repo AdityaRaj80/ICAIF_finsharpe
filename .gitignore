@@ -21,3 +21,9 @@ panel/_*.txt
 .cache/
 .pipcache/
 .DS_Store
+
+# ETT public benchmark (reproducible via curl from zhouhaoyi/ETDataset)
+bench/*.csv
+
+# bench transient run logs (keep the .md reports)
+bench/_*.txt

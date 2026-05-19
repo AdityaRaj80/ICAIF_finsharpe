@@ -36,7 +36,11 @@ class _GRN(nn.Module):
 
 # ---------- 1. DLinear (Zeng AAAI'23): decomposition + linear ----------
 class DLinear(nn.Module):
-    def __init__(self, n_feat, seq_len, d_model=128, kernel=25):
+    # Canonical decomposition+linear KEPT AS-IS: its strength is being the
+    # correct strong-SIMPLE baseline (bloating it would make it not-DLinear
+    # and defeat the honest deep-vs-linear contrast). Only the output rep
+    # width tracks the shared d_model for interface parity.
+    def __init__(self, n_feat, seq_len, d_model=256, kernel=25):
         super().__init__()
         self.dec = _MovingAvg(kernel)
         self.lt, self.ls = nn.Linear(seq_len, d_model), nn.Linear(seq_len, d_model)
@@ -53,7 +57,7 @@ class DLinear(nn.Module):
 
 # ---------- 2. LSTM / 3. RNN baselines (504-len caveat, honest) ----------
 class LSTMEnc(nn.Module):
-    def __init__(self, n_feat, seq_len, d_model=128, layers=2):
+    def __init__(self, n_feat, seq_len, d_model=256, layers=3):
         super().__init__()
         self.rnn = nn.LSTM(n_feat, d_model, layers, batch_first=True,
                            dropout=0.1)
@@ -63,7 +67,7 @@ class LSTMEnc(nn.Module):
 
 
 class RNNEnc(nn.Module):
-    def __init__(self, n_feat, seq_len, d_model=128, layers=2):
+    def __init__(self, n_feat, seq_len, d_model=256, layers=3):
         super().__init__()
         self.rnn = nn.RNN(n_feat, d_model, layers, batch_first=True,
                           nonlinearity="tanh", dropout=0.1)
@@ -74,16 +78,16 @@ class RNNEnc(nn.Module):
 
 # ---------- 4. TCN (Bai'18): dilated CAUSAL conv (explicit left pad) ----
 class TCN(nn.Module):
-    def __init__(self, n_feat, seq_len, d_model=128):
+    def __init__(self, n_feat, seq_len, d_model=256):
         super().__init__()
         self.layers = nn.ModuleList()
         cin = n_feat
-        for i in range(9):                       # dil 1..256 -> RF 1023>=504
+        for i in range(10):                      # dil 1..512 -> RF 2047>=504
             self.layers.append(nn.ModuleDict({
                 "c": nn.Conv1d(cin, d_model, 3, dilation=2 ** i),
                 "d": nn.Dropout(0.1)}))
             cin = d_model
-        self.dils = [2 ** i for i in range(9)]
+        self.dils = [2 ** i for i in range(10)]
 
     def forward(self, x):
         h = x.transpose(1, 2)                    # [B,F,L]
@@ -95,7 +99,7 @@ class TCN(nn.Module):
 
 # ---------- 5. iTransformer (Liu ICLR'24): variate tokens ----------
 class iTransformer(nn.Module):
-    def __init__(self, n_feat, seq_len, d_model=128, heads=8, layers=3):
+    def __init__(self, n_feat, seq_len, d_model=256, heads=8, layers=4):
         super().__init__()
         self.emb = nn.Linear(seq_len, d_model)   # whole series per variate
         enc = nn.TransformerEncoderLayer(d_model, heads, d_model * 4, 0.1,
@@ -114,8 +118,8 @@ class iTransformer(nn.Module):
 
 # ---------- 6. PatchTST (Nie ICLR'23): patch + CHANNEL-INDEPENDENCE ----
 class PatchTST(nn.Module):
-    def __init__(self, n_feat, seq_len, d_model=128, patch=24, stride=12,
-                 heads=8, layers=3):
+    def __init__(self, n_feat, seq_len, d_model=256, patch=16, stride=8,
+                 heads=8, layers=4):
         super().__init__()
         self.p, self.s = patch, stride
         npatch = (seq_len + (stride - (seq_len - patch) % stride) % stride
@@ -127,7 +131,12 @@ class PatchTST(nn.Module):
                                          batch_first=True)
         self.tr = nn.TransformerEncoder(enc, layers)
         self.proj = nn.Linear(self.npatch * d_model, d_model)
-        self.head = nn.Linear(n_feat * d_model, d_model)   # mixing ONLY here
+        # PERMUTATION-INVARIANT channel reduction (re-jury-5 fix): the prior
+        # Linear(n_feat*d_model) flatten was channel-ORDER-dependent and
+        # defeated PatchTST's channel-independence for the model AS USED.
+        # Mean over the F channel axis is symmetric -> forward() is provably
+        # invariant to channel permutation (verify_models.py T-CI).
+        self.outp = nn.Linear(d_model, d_model)
 
     def backbone(self, x):                       # CHANNEL-INDEPENDENT [B,F,d]
         B, L, Fd = x.shape
@@ -140,8 +149,8 @@ class PatchTST(nn.Module):
         return self.proj(h.reshape(B * Fd, -1)).view(B, Fd, -1)
 
     def forward(self, x):
-        r = self.backbone(x)                                # [B,F,d]
-        return self.head(r.reshape(x.size(0), -1))           # mix in head only
+        r = self.backbone(x)                                # [B,F,d] chan-indep
+        return self.outp(r.mean(1))                         # symmetric over F
 
 
 # ---------- 7. GCformer (Zhao CIKM'23): STRUCTURED global conv + local ---
@@ -150,8 +159,8 @@ class GCformer(nn.Module):
     decaying bases (params O(d*K), SUBLINEAR in L, length-covering) — a
     faithful structured-global-kernel (not a dense FIR). Local branch =
     Transformer on the recent window. Fuse."""
-    def __init__(self, n_feat, seq_len, d_model=128, heads=8, K=8,
-                 local=64):
+    def __init__(self, n_feat, seq_len, d_model=256, heads=8, K=24,
+                 local=128):
         super().__init__()
         self.L, self.K, self.local = seq_len, K, local
         self.proj = nn.Linear(n_feat, d_model)
@@ -164,7 +173,7 @@ class GCformer(nn.Module):
         self.coef = nn.Parameter(torch.randn(d_model, K) * 0.1)
         enc = nn.TransformerEncoderLayer(d_model, heads, d_model * 4, 0.1,
                                          batch_first=True)
-        self.tr = nn.TransformerEncoder(enc, 2)
+        self.tr = nn.TransformerEncoder(enc, 3)         # deeper local branch
 
     def global_kernel(self):                     # [d_model, L] structured
         t = torch.arange(self.L, device=self.decay.device).float()
@@ -187,7 +196,7 @@ class TFT(nn.Module):
     """Reduced OBSERVED-ONLY TFT (FNSPID has no static/known-future) with
     PER-VARIABLE embeddings (W,B per feature) + variable-selection softmax
     + GRN + LSTM + gated interpretable attention."""
-    def __init__(self, n_feat, seq_len, d_model=128, heads=4):
+    def __init__(self, n_feat, seq_len, d_model=256, heads=4):
         super().__init__()
         self.W = nn.Parameter(torch.randn(n_feat, d_model) * 0.05)
         self.b = nn.Parameter(torch.zeros(n_feat, d_model))
