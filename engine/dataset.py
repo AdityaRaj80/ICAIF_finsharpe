@@ -12,7 +12,9 @@ import pandas as pd
 import pyarrow.dataset as ds
 import torch
 
-PANEL = r"D:\Study\FinSharpe\panel\features.parquet"
+import os as _os
+PANEL = _os.environ.get("P2_PANEL",
+                        r"D:\Study\FinSharpe\panel\features.parquet")
 SEQ_LEN = 504
 NONFEAT = {"symbol", "date", "split"}
 
@@ -26,7 +28,8 @@ def load_panel(split, H, symbols=None):
     d = ds.dataset(PANEL, format="parquet")
     feat = _feature_cols(d.schema.names)
     cols = ["symbol", "date", "split", f"fwd_ret_{H}", f"fwd_vol_{H}"] + feat
-    flt = ds.field("split") == split
+    flt = (ds.field("split") == split if isinstance(split, str)
+           else ds.field("split").isin(list(split)))   # pool >=1 splits
     if symbols is not None:
         flt = flt & ds.field("symbol").isin(list(symbols))
     df = d.to_table(columns=cols, filter=flt).to_pandas()

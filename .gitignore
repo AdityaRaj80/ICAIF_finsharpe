@@ -27,3 +27,6 @@ bench/*.csv
 
 # bench transient run logs (keep the .md reports)
 bench/_*.txt
+.smoke/
+p2out/
+bench/phase2_results.md
