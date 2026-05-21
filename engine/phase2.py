@@ -46,6 +46,7 @@ from dataset import DateGroupedLoader, cpcv_folds, nested_inner
 from registry import Model, TAU
 from heads import composite_risk_loss
 
+_T0 = time.time()                              # process start (heartbeat)
 POOL = ("train", "val", "test")
 H = int(os.environ.get("P2_H", "5"))
 # P2_SMOKE=1 ONLY for the local correctness smoke (never set by the
@@ -194,6 +195,9 @@ def _train(model, L, train_dates, hp, seed, max_epoch=MAX_EPOCH,
             torch.nn.utils.clip_grad_norm_(model.parameters(), hp["clip"])
             scaler.step(opt); scaler.update()
         m = _val_metric(model, L, inner_val)
+        print(f"[hb] {model.name}/{model.arm} ep{ep} val={m:.5f} "
+              f"best={max(best, m):.5f} {time.time() - _T0:,.0f}s",
+              flush=True)
         if trial is not None:
             trial.report(m, ep)
             if trial.should_prune():
@@ -326,6 +330,8 @@ def run_hpo(model, arm):
         best = st.best_params
     else:
         def obj(t):
+            print(f"[hb] HPO {model}/{arm} trial {t.number}/{N_HPO} "
+                  f"start {time.time() - _T0:,.0f}s", flush=True)
             seed_all(0)
             hp = _space(t, model)
             m = Model(model, arm, n_feat=len(L.feat), seq_len=SEQ_LEN,
