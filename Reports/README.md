@@ -25,6 +25,7 @@ read in numerical order for the full narrative.
 | 14 | [`14_failures_log.md`](14_failures_log.md) | Cross-cutting catalogue of every failure (jury FATALs, MAJORs, code bugs, environment issues) with root cause and resolution. |
 | 15 | [`15_limitations_and_threats.md`](15_limitations_and_threats.md) | What this work explicitly does NOT claim. Survivorship-interaction residual bias, single dataset, FNSPID contamination, honor-bound freeze, sentiment de-scope, 8-page constraint. |
 | 16 | [`16_decisions_log.md`](16_decisions_log.md) | Chronological decision log: what was chosen at each fork, what the alternative was, why this branch was taken. |
+| 17 | [`17_interim_peek_disclosure.md`](17_interim_peek_disclosure.md) | Research-integrity disclosure: interim partial-result peeks during the campaign, what they did and did not touch, the operator's Sharpe question and its refusal, author errors corrected. |
 
 ## Conventions used throughout
 
