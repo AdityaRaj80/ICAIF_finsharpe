@@ -31,3 +31,4 @@ bench/_*.txt
 p2out/
 bench/phase2_results.md
 .claude/
+hpc_mirror/
